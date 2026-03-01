@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Books - Library Management System</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        .tab-container {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 1rem;
+        }
+        .tab {
+            padding: 0.5rem 2rem;
+            cursor: pointer;
+            border-radius: 5px;
+            font-weight: 500;
+        }
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+        .fine-badge {
+            background: #ff4757;
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.8rem;
+            margin-left: 0.5rem;
+        }
+        .due-date {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        .overdue {
+            color: #ff4757;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <nav class="dashboard-nav">
+            <div class="nav-brand">📚 LibraryMS</div>
+            <div class="nav-menu">
+                <a href="dashboard.html" class="nav-item">Dashboard</a>
+                <a href="books.html" class="nav-item">Books</a>
+                <a href="my-books.html" class="nav-item active">My Books</a>
+                <div class="user-info">
+                    <span class="user-name" id="userName">Loading...</span>
+                    <button class="logout-btn" onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </nav>
+        
+        <div class="main-content">
+            <div class="section-header">
+                <h2>📚 My Borrowed Books</h2>
+            </div>
+            
+            <div class="tab-container">
+                <div class="tab active" onclick="switchTab('current')" id="tabCurrent">Currently Borrowed</div>
+                <div class="tab" onclick="switchTab('history')" id="tabHistory">History</div>
+                <div class="tab" onclick="switchTab('overdue')" id="tabOverdue">Overdue</div>
+            </div>
+            
+            <div class="books-table-container" id="currentTab">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Book Title</th>
+                            <th>Borrow Date</th>
+                            <th>Due Date</th>
+                            <th>Days Left</th>
+                            <th>Fine</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="currentBooksBody">
+                        <tr>
+                            <td colspan="6" class="loading">Loading your books...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="books-table-container" id="historyTab" style="display: none;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Book Title</th>
+                            <th>Borrow Date</th>
+                            <th>Return Date</th>
+                            <th>Fine Paid</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyBooksBody">
+                        <tr>
+                            <td colspan="5" class="loading">Loading history...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="books-table-container" id="overdueTab" style="display: none;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Book Title</th>
+                            <th>Due Date</th>
+                            <th>Days Overdue</th>
+                            <th>Fine</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="overdueBooksBody">
+                        <tr>
+                            <td colspan="5" class="loading">Checking overdue books...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <div id="errorMessage" class="error-message" style="display: none;"></div>
+    
+    <script src="../js/main.js"></script>
+    <script>
+        const userId = sessionStorage.getItem('userId');
+        let allRecords = [];
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuth();
+            loadUserInfo();
+            loadBorrowRecords();
+        });
+        
+        function loadUserInfo() {
+            const username = sessionStorage.getItem('username');
+            document.getElementById('userName').textContent = username || 'User';
+        }
+        
+        async function loadBorrowRecords() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/borrow/user/${userId}`);
+                allRecords = await response.json();
+                displayCurrentBooks();
+                displayHistory();
+                displayOverdueBooks();
+            } catch (error) {
+                console.error('Error loading borrow records:', error);
+                showError('Failed to load your books');
+            }
+        }
+        
+        function displayCurrentBooks() {
+            const current = allRecords.filter(record => record.status === 'BORROWED');
+            const tbody = document.getElementById('currentBooksBody');
+            
+            if (current.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="no-data">No books currently borrowed</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = current.map(record => {
+                const today = new Date();
+                const dueDate = new Date(record.dueDate);
+                const daysLeft = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+                const isOverdue = daysLeft < 0;
+                
+                return `
+                    <tr>
+                        <td>${record.book?.title || 'Unknown'}</td>
+                        <td>${new Date(record.borrowDate).toLocaleDateString()}</td>
+                        <td class="${isOverdue ? 'overdue' : ''}">${new Date(record.dueDate).toLocaleDateString()}</td>
+                        <td class="${isOverdue ? 'overdue' : ''}">${isOverdue ? Math.abs(daysLeft) + ' days overdue' : daysLeft + ' days'}</td>
+                        <td>${record.fine > 0 ? '₹' + record.fine : 'No fine'}</td>
+                        <td>
+                            <button class="action-btn" onclick="returnBook(${record.id})">Return</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        function displayHistory() {
+            const history = allRecords.filter(record => record.status === 'RETURNED');
+            const tbody = document.getElementById('historyBooksBody');
+            
+            if (history.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="no-data">No borrowing history</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = history.map(record => `
+                <tr>
+                    <td>${record.book?.title || 'Unknown'}</td>
+                    <td>${new Date(record.borrowDate).toLocaleDateString()}</td>
+                    <td>${record.returnDate ? new Date(record.returnDate).toLocaleDateString() : 'N/A'}</td>
+                    <td>${record.fine > 0 ? '₹' + record.fine : 'No fine'}</td>
+                    <td><span class="status-badge status-available">Returned</span></td>
+                </tr>
+            `).join('');
+        }
+        
+        function displayOverdueBooks() {
+            const today = new Date();
+            const overdue = allRecords.filter(record => {
+                if (record.status !== 'BORROWED') return false;
+                const dueDate = new Date(record.dueDate);
+                return dueDate < today;
+            });
+            
+            const tbody = document.getElementById('overdueBooksBody');
+            
+            if (overdue.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="no-data">No overdue books</td></tr>';
+                document.getElementById('tabOverdue').innerHTML = 'Overdue';
+                return;
+            }
+            
+            document.getElementById('tabOverdue').innerHTML = `Overdue <span class="fine-badge">${overdue.length}</span>`;
+            
+            tbody.innerHTML = overdue.map(record => {
+                const dueDate = new Date(record.dueDate);
+                const today = new Date();
+                const daysOverdue = Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24));
+                const fine = daysOverdue * 10;
+                
+                return `
+                    <tr>
+                        <td>${record.book?.title || 'Unknown'}</td>
+                        <td class="overdue">${dueDate.toLocaleDateString()}</td>
+                        <td class="overdue">${daysOverdue} days</td>
+                        <td class="overdue">₹${fine}</td>
+                        <td>
+                            <button class="action-btn" onclick="returnBook(${record.id})" style="border-color:#ff4757; color:#ff4757;">Return & Pay Fine</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        async function returnBook(recordId) {
+            if (!confirm('Return this book?')) return;
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/borrow/return/${recordId}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showSuccess('Book returned successfully');
+                    loadBorrowRecords(); // Refresh
+                } else {
+                    showError(data.error || 'Failed to return book');
+                }
+            } catch (error) {
+                console.error('Error returning book:', error);
+                showError('Failed to return book');
+            }
+        }
+        
+        function switchTab(tab) {
+            document.getElementById('currentTab').style.display = 'none';
+            document.getElementById('historyTab').style.display = 'none';
+            document.getElementById('overdueTab').style.display = 'none';
+            
+            document.getElementById('tabCurrent').classList.remove('active');
+            document.getElementById('tabHistory').classList.remove('active');
+            document.getElementById('tabOverdue').classList.remove('active');
+            
+            if (tab === 'current') {
+                document.getElementById('currentTab').style.display = 'block';
+                document.getElementById('tabCurrent').classList.add('active');
+            } else if (tab === 'history') {
+                document.getElementById('historyTab').style.display = 'block';
+                document.getElementById('tabHistory').classList.add('active');
+            } else {
+                document.getElementById('overdueTab').style.display = 'block';
+                document.getElementById('tabOverdue').classList.add('active');
+            }
+        }
+    </script>
+</body>
+</html>
