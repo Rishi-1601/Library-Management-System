@@ -1,0 +1,67 @@
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# VS Code
+.vscode/
+.settings/
+
+# Java
+*.log
+*.jar
+*.war
+*.ear
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+
+# Compiled files
+*.class
+
+# Package Files
+*.jar
+*.war
+*.ear
+
+# Maven
+log/
+target/
+
+# Uploads
+uploads/
+!uploads/.gitkeep
+
+# Environment
+.env
+application-local.properties
+application-dev.properties
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backend specific
+backend/target/
+backend/.settings/
+backend/.classpath
+backend/.project
+backend/.sts4-cache/
+
+# Frontend specific
+frontend/node_modules/
+frontend/package-lock.json
+frontend/dist/
